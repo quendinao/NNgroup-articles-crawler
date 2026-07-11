@@ -289,33 +289,47 @@ class App(tk.Tk):
         self.append_log("==================================================\n")
         self.append_log("YOUTUBE LOGIN & COOKIES ACQUISITION\n")
         self.append_log("==================================================\n")
-        self.append_log(">>> Opening headed browser window... please wait.\n")
+        self.append_log(">>> Opening your actual Chrome profile...\n")
+        self.append_log(">>> IMPORTANT: Please close all active Google Chrome windows before proceeding!\n")
         
         def work():
             async def task():
                 try:
                     async with async_playwright() as p:
-                        user_data_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".yt_profile")
-                        context = await p.chromium.launch_persistent_context(
-                            user_data_dir,
-                            channel="chrome",  # Use local Google Chrome installation
-                            headless=False,
-                            viewport={'width': 1280, 'height': 800},
-                            ignore_default_args=["--enable-automation"]
-                        )
+                        user_data_dir = os.path.expandvars(r"%LOCALAPPDATA%\Google\Chrome\User Data")
+                        
+                        try:
+                            context = await p.chromium.launch_persistent_context(
+                                user_data_dir,
+                                channel="chrome",  # Use local Google Chrome installation
+                                headless=False,
+                                viewport={'width': 1280, 'height': 800},
+                                ignore_default_args=["--enable-automation"]
+                            )
+                        except Exception as launch_err:
+                            self.append_log(f"\n[Launch Error]: {launch_err}\n")
+                            self.append_log("\n[Action Required]: Google Chrome is likely already open on your computer.\n")
+                            self.append_log("Please CLOSE all active Google Chrome windows and try again.\n")
+                            messagebox.showerror(
+                                "Chrome is Active",
+                                "Cannot open Chrome because it is currently running.\n\nPlease close all Google Chrome windows and try again."
+                            )
+                            return
+
                         # Mask webdriver property to bypass Google bot detection
                         await context.add_init_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
                         page = context.pages[0] if context.pages else await context.new_page()
                         await page.goto("https://www.youtube.com")
                         
                         self.append_log("\n[Action Required]:\n")
-                        self.append_log("1. Please log in to your Google/YouTube account in the browser window.\n")
-                        self.append_log("2. After logging in, return to this app and click OK in the popup.\n")
-                        self.append_log("3. Click CANCEL on the popup to abort the login flow.\n\n")
+                        self.append_log("1. Check if you are already logged in to YouTube in the browser window.\n")
+                        self.append_log("2. If not, please log in.\n")
+                        self.append_log("3. Once logged in, return to this app and click OK to save cookies.\n")
+                        self.append_log("4. Click CANCEL to abort.\n\n")
                         
                         is_logged_in = messagebox.askokcancel(
-                            "YouTube Login", 
-                            "Please log in to YouTube in the browser window.\n\nOnce logged in, click OK here to save cookies.\nClick Cancel to abort."
+                            "YouTube Cookies", 
+                            "Once YouTube is open and you are logged in, click OK to save cookies.\n\nClick Cancel to abort."
                         )
                         
                         if is_logged_in:
@@ -323,7 +337,7 @@ class App(tk.Tk):
                             yt_cookies = [c for c in cookies if 'youtube.com' in c['domain'] or 'youtube' in c['domain']]
                             
                             if not yt_cookies:
-                                self.append_log("  [Warning] No YouTube cookies found. Make sure you logged in on youtube.com.\n")
+                                self.append_log("  [Warning] No YouTube cookies found.\n")
                                 
                             cookies_file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "youtube_cookies.txt")
                             with open(cookies_file_path, "w", encoding="utf-8") as f:
