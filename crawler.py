@@ -75,8 +75,20 @@ def get_youtube_video_id(url):
 
 def fetch_youtube_transcript(video_id):
     try:
-        api = YouTubeTranscriptApi()
-        transcript_list = api.list(video_id)
+        # Check for cookies files in the project root directory
+        cookies_file = None
+        for name in ["youtube_cookies.txt", "cookies.txt"]:
+            p = os.path.join(os.path.dirname(os.path.abspath(__file__)), name)
+            if os.path.exists(p):
+                cookies_file = p
+                break
+
+        if cookies_file:
+            print(f"  [YouTube API] Using cookies from: {os.path.basename(cookies_file)}")
+            transcript_list = YouTubeTranscriptApi.list_transcripts(video_id, cookies=cookies_file)
+        else:
+            api = YouTubeTranscriptApi()
+            transcript_list = api.list(video_id)
         # Try Vietnamese first, then English, then fallback
         try:
             transcript = transcript_list.find_transcript(['vi'])
@@ -176,7 +188,7 @@ def parse_root_guide(html_content):
     # Filter empty sections
     return {k: v for k, v in topics.items() if v}
 
-async def run_crawler(root_url=None, output_dir=None):
+async def run_crawler(root_url=None, output_dir=None, no_fallback=False):
     if root_url is None:
         root_url = ROOT_URL
     if output_dir is None:
@@ -334,6 +346,8 @@ async def run_crawler(root_url=None, output_dir=None):
                                     success_downloads.append({'title': link_title, 'url': url, 'section': topic, 'type': 'Embedded Video Transcript'})
                                     continue
                                 else:
+                                    if no_fallback:
+                                        raise Exception("Failed to fetch YouTube subtitles/transcript (no-fallback enabled)")
                                     print("  [Warning] Subtitle fetch failed, falling back to standard page print.")
                         
                         # Process as a standard article
@@ -454,11 +468,11 @@ def write_report(successes, failures):
     print("==================================================")
 
 if __name__ == "__main__":
-    import sys
-    target_url = ROOT_URL
-    target_dir = OUTPUT_DIR
-    if len(sys.argv) > 1 and sys.argv[1].startswith("http"):
-        target_url = sys.argv[1]
-    if len(sys.argv) > 2:
-        target_dir = sys.argv[2]
-    asyncio.run(run_crawler(target_url, target_dir))
+    import argparse
+    parser = argparse.ArgumentParser(description="UX Psychology Articles Crawler")
+    parser.add_argument("url", nargs="?", default=ROOT_URL, help="The study guide URL to crawl.")
+    parser.add_argument("output_dir", nargs="?", default=OUTPUT_DIR, help="The directory to save PDFs.")
+    parser.add_argument("--no-fallback", action="store_true", help="Do not fall back to standard page print if transcript fails.")
+    args = parser.parse_args()
+    
+    asyncio.run(run_crawler(args.url, args.output_dir, no_fallback=args.no_fallback))

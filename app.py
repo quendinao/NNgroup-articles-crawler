@@ -326,7 +326,7 @@ class App(tk.Tk):
             messagebox.showerror("Error", "Please select a saving folder.")
             return
             
-        cmd = [sys.executable, "crawler.py", url, save_dir]
+        cmd = [sys.executable, "-u", "crawler.py", url, save_dir, "--no-fallback"]
         self.run_subprocess_thread(cmd, "Crawling...")
         
     def trigger_verify(self):
@@ -337,7 +337,7 @@ class App(tk.Tk):
             messagebox.showerror("Error", "URL and Save Directory must be set.")
             return
             
-        cmd = [sys.executable, "verify_downloads.py", url, "--output-dir", save_dir]
+        cmd = [sys.executable, "-u", "verify_downloads.py", url, "--output-dir", save_dir]
         self.run_subprocess_thread(cmd, "Verifying PDFs...")
         
     def trigger_retry(self):
@@ -348,7 +348,7 @@ class App(tk.Tk):
             messagebox.showerror("Error", "URL and Save Directory must be set.")
             return
             
-        cmd = [sys.executable, "verify_downloads.py", url, "--output-dir", save_dir, "--retry"]
+        cmd = [sys.executable, "-u", "verify_downloads.py", url, "--output-dir", save_dir, "--retry"]
         self.run_subprocess_thread(cmd, "Smart Retrying...")
         
     def cancel_execution(self):
