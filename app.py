@@ -332,6 +332,28 @@ class App(tk.Tk):
             self.cookies_status_var.set("Not found (transcripts may fail on rate limit)")
             self.cookies_status_label.config(fg="#a6adc8")
 
+    def ask_ok_cancel_safe(self, title, message):
+        import queue
+        q = queue.Queue()
+        def show():
+            self.lift()
+            self.focus_force()
+            res = messagebox.askokcancel(title, message)
+            q.put(res)
+        self.after(0, show)
+        return q.get()
+
+    def show_error_safe(self, title, message):
+        import queue
+        q = queue.Queue()
+        def show():
+            self.lift()
+            self.focus_force()
+            res = messagebox.showerror(title, message)
+            q.put(res)
+        self.after(0, show)
+        return q.get()
+
     def get_youtube_cookies(self):
         self.clear_log()
         self.toggle_inputs(False)
@@ -389,7 +411,7 @@ class App(tk.Tk):
                             if selected_profile_dir != ".yt_profile":
                                 self.append_log("\n[Action Required]: Google Chrome is likely already open with this profile.\n")
                                 self.append_log("Please CLOSE all active Google Chrome windows and try again, or use the 'Isolated Profile'.\n")
-                                messagebox.showerror(
+                                self.show_error_safe(
                                     "Chrome Profile Locked",
                                     f"Cannot open Chrome Profile '{selected_display_name}' because Chrome is currently running.\n\nPlease close all Chrome windows and try again, or select 'Isolated Profile'."
                                 )
@@ -417,7 +439,7 @@ class App(tk.Tk):
                             self.append_log("2. Once successfully signed in, return to this app and click OK.\n")
                             self.append_log("3. Click CANCEL to abort the login flow.\n\n")
                             
-                            is_logged_in = messagebox.askokcancel(
+                            is_logged_in = self.ask_ok_cancel_safe(
                                 "Google Sign-In", 
                                 "1. Log in to your Google/YouTube account in the browser window.\n\n2. Once signed in, click OK here to capture cookies.\n\nClick Cancel to abort."
                             )
@@ -431,7 +453,7 @@ class App(tk.Tk):
                             self.append_log("3. If not, log in first and then click OK.\n")
                             self.append_log("4. Click CANCEL to abort.\n\n")
                             
-                            is_logged_in = messagebox.askokcancel(
+                            is_logged_in = self.ask_ok_cancel_safe(
                                 "YouTube Cookies", 
                                 "Verify you are logged in to YouTube in the browser window.\n\nClick OK here to capture cookies.\n\nClick Cancel to abort."
                             )
