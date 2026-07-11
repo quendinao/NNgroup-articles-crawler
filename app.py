@@ -378,11 +378,11 @@ class App(tk.Tk):
                             else:
                                 context = await p.chromium.launch_persistent_context(
                                     user_data_dir,
-                                    profile_name=profile_name,
                                     channel="chrome",  # Use local Google Chrome installation
                                     headless=False,
                                     viewport={'width': 1280, 'height': 800},
-                                    ignore_default_args=["--enable-automation"]
+                                    ignore_default_args=["--enable-automation"],
+                                    args=[f"--profile-directory={profile_name}"]
                                 )
                         except Exception as launch_err:
                             self.append_log(f"\n[Launch Error]: {launch_err}\n")
