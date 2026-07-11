@@ -83,22 +83,25 @@ def fetch_youtube_transcript(video_id):
                 cookies_file = p
                 break
 
+        import requests
+        session = requests.Session()
+        # Set real browser headers to prevent YouTube bot detection
+        session.headers.update({
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept-Language': 'en-US,en;q=0.9'
+        })
+
         if cookies_file:
             print(f"  [YouTube API] Using cookies from: {os.path.basename(cookies_file)}")
-            import requests
             from http.cookiejar import MozillaCookieJar
             try:
-                session = requests.Session()
                 cj = MozillaCookieJar(cookies_file)
                 cj.load(ignore_discard=True, ignore_expires=True)
                 session.cookies = cj
-                api = YouTubeTranscriptApi(http_client=session)
             except Exception as cookie_err:
                 print(f"  [Warning] Failed to load cookies file ({cookie_err}). Proceeding without cookies.")
-                api = YouTubeTranscriptApi()
-        else:
-            api = YouTubeTranscriptApi()
-
+        
+        api = YouTubeTranscriptApi(http_client=session)
         transcript_list = api.list(video_id)
         # Try Vietnamese first, then English, then fallback
         try:
