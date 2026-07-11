@@ -289,14 +289,13 @@ class App(tk.Tk):
         self.append_log("==================================================\n")
         self.append_log("YOUTUBE LOGIN & COOKIES ACQUISITION\n")
         self.append_log("==================================================\n")
-        self.append_log(">>> Opening your actual Chrome profile...\n")
-        self.append_log(">>> IMPORTANT: Please close all active Google Chrome windows before proceeding!\n")
+        self.append_log(">>> Opening isolated browser profile...\n")
         
         def work():
             async def task():
                 try:
                     async with async_playwright() as p:
-                        user_data_dir = os.path.expandvars(r"%LOCALAPPDATA%\Google\Chrome\User Data")
+                        user_data_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".yt_profile")
                         
                         try:
                             context = await p.chromium.launch_persistent_context(
@@ -307,32 +306,37 @@ class App(tk.Tk):
                                 ignore_default_args=["--enable-automation"]
                             )
                         except Exception as launch_err:
-                            self.append_log(f"\n[Launch Error]: {launch_err}\n")
-                            self.append_log("\n[Action Required]: Google Chrome is likely already open on your computer.\n")
-                            self.append_log("Please CLOSE all active Google Chrome windows and try again.\n")
-                            messagebox.showerror(
-                                "Chrome is Active",
-                                "Cannot open Chrome because it is currently running.\n\nPlease close all Google Chrome windows and try again."
+                            self.append_log(f"\n[Launch Info]: Local Chrome launch issue ({launch_err}).\n")
+                            self.append_log(">>> Falling back to packaged Chromium binary...\n")
+                            context = await p.chromium.launch_persistent_context(
+                                user_data_dir,
+                                headless=False,
+                                viewport={'width': 1280, 'height': 800},
+                                ignore_default_args=["--enable-automation"]
                             )
-                            return
 
                         # Mask webdriver property to bypass Google bot detection
                         await context.add_init_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
                         page = context.pages[0] if context.pages else await context.new_page()
-                        await page.goto("https://www.youtube.com")
+                        
+                        # Go to Google Accounts login first (sign-in is much more reliable here than direct YouTube)
+                        await page.goto("https://accounts.google.com/ServiceLogin")
                         
                         self.append_log("\n[Action Required]:\n")
-                        self.append_log("1. Check if you are already logged in to YouTube in the browser window.\n")
-                        self.append_log("2. If not, please log in.\n")
-                        self.append_log("3. Once logged in, return to this app and click OK to save cookies.\n")
-                        self.append_log("4. Click CANCEL to abort.\n\n")
+                        self.append_log("1. Log in to your Google Account in the browser window.\n")
+                        self.append_log("2. Once successfully signed in, return to this app and click OK.\n")
+                        self.append_log("3. Click CANCEL to abort the login flow.\n\n")
                         
                         is_logged_in = messagebox.askokcancel(
-                            "YouTube Cookies", 
-                            "Once YouTube is open and you are logged in, click OK to save cookies.\n\nClick Cancel to abort."
+                            "Google Sign-In", 
+                            "1. Log in to your Google/YouTube account in the browser window.\n\n2. Once signed in, click OK here to capture cookies.\n\nClick Cancel to abort."
                         )
                         
                         if is_logged_in:
+                            self.append_log(">>> Redirecting to YouTube to generate session cookies...\n")
+                            await page.goto("https://www.youtube.com")
+                            await page.wait_for_timeout(3000)  # Wait for cookies to write
+                            
                             cookies = await context.cookies()
                             yt_cookies = [c for c in cookies if 'youtube.com' in c['domain'] or 'youtube' in c['domain']]
                             
