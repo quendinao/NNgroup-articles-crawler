@@ -4,6 +4,8 @@ import tkinter as tk
 from tkinter import ttk, filedialog, messagebox, scrolledtext
 import threading
 import subprocess
+import asyncio
+from playwright.async_api import async_playwright
 
 # Theme Colors (Catppuccin Mocha-inspired premium dark theme)
 BG_COLOR = "#1e1e2e"          # Dark base
@@ -36,6 +38,7 @@ class App(tk.Tk):
         
         self.create_styles()
         self.create_widgets()
+        self.update_cookies_status()
         
     def create_styles(self):
         # Configure overall ttk styles to look flat and modern
@@ -126,6 +129,38 @@ class App(tk.Tk):
             font=("Segoe UI Semibold", 9)
         )
         browse_btn.grid(row=1, column=2, padx=(10, pad_x), pady=pad_y)
+        
+        # YouTube Session status row
+        yt_label = ttk.Label(inputs_card, text="YouTube Cookies:", style='CardLabel.TLabel')
+        yt_label.grid(row=2, column=0, sticky="w", padx=(pad_x, 10), pady=pad_y)
+        
+        self.cookies_status_var = tk.StringVar(value="Checking...")
+        self.cookies_status_label = tk.Label(
+            inputs_card, 
+            textvariable=self.cookies_status_var,
+            bg=CARD_BG, 
+            fg=ACCENT_RED,
+            font=("Segoe UI", 9, "italic"),
+            anchor="w"
+        )
+        self.cookies_status_label.grid(row=2, column=1, sticky="w", pady=pad_y)
+        
+        # Get Cookies Button
+        get_cookies_btn = tk.Button(
+            inputs_card, 
+            text="Get Cookies", 
+            command=self.get_youtube_cookies,
+            bg=ACCENT_BLUE, 
+            fg="#11111b", 
+            bd=0, 
+            padx=15, 
+            pady=3, 
+            relief="flat", 
+            activebackground="#74c7ec", 
+            activeforeground="#11111b",
+            font=("Segoe UI Semibold", 9)
+        )
+        get_cookies_btn.grid(row=2, column=2, padx=(10, pad_x), pady=pad_y)
         
         # --- 3. CONSOLE OUTPUT PANEL ---
         console_frame = ttk.Frame(self, style='TFrame')
@@ -232,6 +267,89 @@ class App(tk.Tk):
         if selected_dir:
             self.dir_var.set(os.path.abspath(selected_dir))
             
+    def update_cookies_status(self):
+        cookies_file = None
+        for name in ["youtube_cookies.txt", "cookies.txt"]:
+            p = os.path.join(os.path.dirname(os.path.abspath(__file__)), name)
+            if os.path.exists(p):
+                cookies_file = p
+                break
+                
+        if cookies_file:
+            self.cookies_status_var.set(f"Active ({os.path.basename(cookies_file)})")
+            self.cookies_status_label.config(fg=ACCENT_GREEN)
+        else:
+            self.cookies_status_var.set("Not found (transcripts may fail on rate limit)")
+            self.cookies_status_label.config(fg="#a6adc8")
+
+    def get_youtube_cookies(self):
+        self.clear_log()
+        self.toggle_inputs(False)
+        self.set_status("Logging in to YouTube...", True)
+        self.append_log("==================================================\n")
+        self.append_log("YOUTUBE LOGIN & COOKIES ACQUISITION\n")
+        self.append_log("==================================================\n")
+        self.append_log(">>> Opening headed browser window... please wait.\n")
+        
+        def work():
+            async def task():
+                try:
+                    async with async_playwright() as p:
+                        browser = await p.chromium.launch(headless=False)
+                        context = await browser.new_context()
+                        page = await context.new_page()
+                        await page.goto("https://www.youtube.com")
+                        
+                        self.append_log("\n[Action Required]:\n")
+                        self.append_log("1. Please log in to your Google/YouTube account in the browser window.\n")
+                        self.append_log("2. After logging in, return to this app and click OK in the popup.\n")
+                        self.append_log("3. Click CANCEL on the popup to abort the login flow.\n\n")
+                        
+                        is_logged_in = messagebox.askokcancel(
+                            "YouTube Login", 
+                            "Please log in to YouTube in the browser window.\n\nOnce logged in, click OK here to save cookies.\nClick Cancel to abort."
+                        )
+                        
+                        if is_logged_in:
+                            cookies = await context.cookies()
+                            yt_cookies = [c for c in cookies if 'youtube.com' in c['domain'] or 'youtube' in c['domain']]
+                            
+                            if not yt_cookies:
+                                self.append_log("  [Warning] No YouTube cookies found. Make sure you logged in on youtube.com.\n")
+                                
+                            cookies_file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "youtube_cookies.txt")
+                            with open(cookies_file_path, "w", encoding="utf-8") as f:
+                                f.write("# Netscape HTTP Cookie File\n")
+                                f.write("# http://curl.haxx.se/rfc/cookie_spec.html\n")
+                                f.write("# This is a generated file! Do not edit.\n\n")
+                                for cookie in cookies:
+                                    domain = cookie['domain']
+                                    include_subdomains = "TRUE" if domain.startswith('.') or len(domain.split('.')) > 2 else "FALSE"
+                                    path = cookie['path']
+                                    secure = "TRUE" if cookie['secure'] else "FALSE"
+                                    expiry = str(int(cookie.get('expires', 0))) if 'expires' in cookie else "0"
+                                    name = cookie['name']
+                                    value = cookie['value']
+                                    f.write(f"{domain}\t{include_subdomains}\t{path}\t{secure}\t{expiry}\t{name}\t{value}\n")
+                                    
+                            self.append_log(f"\n[Success] Saved YouTube login cookies to:\n {cookies_file_path}\n")
+                            self.update_cookies_status()
+                            messagebox.showinfo("Success", "YouTube login cookies saved successfully!")
+                        else:
+                            self.append_log("\n[Cancelled] YouTube login flow cancelled by user.\n")
+                            
+                        await browser.close()
+                except Exception as e:
+                    self.append_log(f"\n[Error] Failed during YouTube login: {e}\n")
+                    messagebox.showerror("Error", f"Failed during YouTube login: {e}")
+                finally:
+                    self.set_status("Ready", False)
+                    self.toggle_inputs(True)
+                    
+            asyncio.run(task())
+            
+        threading.Thread(target=work, daemon=True).start()
+
     def set_status(self, text, is_active=True):
         self.status_label.config(text=f"Status: {text}")
         if is_active:
