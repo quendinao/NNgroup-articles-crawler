@@ -298,9 +298,13 @@ class App(tk.Tk):
                         user_data_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".yt_profile")
                         context = await p.chromium.launch_persistent_context(
                             user_data_dir,
+                            channel="chrome",  # Use local Google Chrome installation
                             headless=False,
-                            viewport={'width': 1280, 'height': 800}
+                            viewport={'width': 1280, 'height': 800},
+                            ignore_default_args=["--enable-automation"]
                         )
+                        # Mask webdriver property to bypass Google bot detection
+                        await context.add_init_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
                         page = context.pages[0] if context.pages else await context.new_page()
                         await page.goto("https://www.youtube.com")
                         
