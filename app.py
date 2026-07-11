@@ -301,10 +301,15 @@ class App(tk.Tk):
                     info_cache = data.get("profile", {}).get("info_cache", {})
                     for dir_name, info in info_cache.items():
                         friendly_name = info.get("name", dir_name)
+                        email = info.get("user_name", "")
+                        
+                        email_suffix = f" - {email}" if email else ""
+                        display_name = f"{friendly_name}{email_suffix} ({dir_name})"
+                        
                         if dir_name == "Default":
-                            profiles[0] = (dir_name, f"{friendly_name} (Default)")
+                            profiles[0] = (dir_name, f"{friendly_name}{email_suffix} (Default)")
                         else:
-                            profiles.append((dir_name, f"{friendly_name} ({dir_name})"))
+                            profiles.append((dir_name, display_name))
             except Exception:
                 pass
                 
