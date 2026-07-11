@@ -295,9 +295,13 @@ class App(tk.Tk):
             async def task():
                 try:
                     async with async_playwright() as p:
-                        browser = await p.chromium.launch(headless=False)
-                        context = await browser.new_context()
-                        page = await context.new_page()
+                        user_data_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".yt_profile")
+                        context = await p.chromium.launch_persistent_context(
+                            user_data_dir,
+                            headless=False,
+                            viewport={'width': 1280, 'height': 800}
+                        )
+                        page = context.pages[0] if context.pages else await context.new_page()
                         await page.goto("https://www.youtube.com")
                         
                         self.append_log("\n[Action Required]:\n")
@@ -338,7 +342,7 @@ class App(tk.Tk):
                         else:
                             self.append_log("\n[Cancelled] YouTube login flow cancelled by user.\n")
                             
-                        await browser.close()
+                        await context.close()
                 except Exception as e:
                     self.append_log(f"\n[Error] Failed during YouTube login: {e}\n")
                     messagebox.showerror("Error", f"Failed during YouTube login: {e}")

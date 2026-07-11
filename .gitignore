@@ -85,4 +85,6 @@ verification_report.txt
 # Ignore YouTube cookies files (crucial for privacy/security)
 youtube_cookies.txt
 cookies.txt
+.yt_profile/
+
 
